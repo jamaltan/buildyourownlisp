@@ -19,7 +19,7 @@ Lval_ptr lval_err(char *e) {
         assert(l != NULL);
         l->type = LVAL_ERR;
         l->err = malloc(strlen(e) + 1);
-	strcpy(l->err, e);
+        strcpy(l->err, e);
         return l;
 }
 
@@ -41,6 +41,36 @@ Lval_ptr lval_sexpr(void) {
         l->count = 0;
         l->cell = NULL;
         return l;
+}
+
+Lval_ptr eval_sexpr(Lval_ptr l) {
+        for (int i = 0; i < l->count; i++) {
+                l->cell[i] = eval(l->cell[i]);
+        }
+
+        for (int i = 0; i < l->count; i++) {
+                if (v->cell[i]->type == LVAL_ERR) {
+                        return lval_take(v, i);
+                }
+        }
+
+        if (l->count == 0) {
+                return l;
+        }
+        if (l->count == 1) {
+                return lval_take(v, 0);
+        }
+
+        Lval_ptr f = lval_pop(l, 0);
+        if (f->type != LVAL_SYM) {
+                lval_delete(f);
+                lval_delete(l);
+                return lval_err("S-expression Does not start with symbol!");
+        }
+
+        Lval_ptr result = builtin_op(l, f->sym);
+        lval_delete(f);
+        return result;
 }
 
 Lval_ptr eval_op(Lval_ptr l, char *op, Lval_ptr r) {
@@ -72,7 +102,8 @@ Lval_ptr eval(mpc_ast_t *t) {
         if (strstr(t->tag, "number")) {
                 errno = 0;
                 long x = strtol(t->contents, NULL, 10);
-                return errno != ERANGE ? lval_num(x) : lval_err(ERR(LERR_BAD_NUM));
+                return errno != ERANGE ? lval_num(x)
+                                       : lval_err(ERR(LERR_BAD_NUM));
         }
 
         char *op = t->children[1]->contents;
